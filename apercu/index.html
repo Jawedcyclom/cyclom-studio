@@ -801,9 +801,10 @@ function renderHead() {
   const sl = $('.side-logo'); if (sl && !sl.innerHTML) sl.innerHTML = $('.logo').outerHTML;
   const L = RAW.comptes;
   let h = '';
-  if (L.length > 1) h += `<button class="acct" type="button" data-acc="tous" aria-pressed="${ACC === 'tous'}"><span class="av all">∑</span>Tous mes comptes</button>`;
+  if (L.length > 1) h += `<button class="acct" type="button" data-acc="tous" aria-pressed="${ACC === 'tous'}"><span class="av all">∑</span>Vue générale · ${L.length} comptes</button>`;
   for (const a of L) h += `<button class="acct" type="button" data-acc="${esc(a.id)}" aria-pressed="${ACC === a.id || L.length === 1}"><span class="av">${esc((a.user || '?')[0].toUpperCase())}</span>@${esc(a.user)}</button>`;
-  if (!DRIVE) h += `<button class="acct add" type="button" id="addAcc">+ Ajouter un compte</button>`;
+  if (WEB) h += `<a class="acct" href="https://jawedcyclom.github.io/cyclom-studio/apercu/" style="text-decoration:none">Aperçu multi-comptes ↗</a>`;
+  if (!DRIVE && !WEB) h += `<button class="acct add" type="button" id="addAcc">+ Ajouter un compte</button>`;
   $('#accts').innerHTML = h;
 }
 
