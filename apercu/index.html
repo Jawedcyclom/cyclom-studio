@@ -1112,6 +1112,7 @@ button,a,[role="button"],.sec.pliable{-webkit-touch-callout:none}
   .w-tx.w-in{-webkit-line-clamp:4;color:var(--fg2)}
   .w-tx.w-in b{display:inline;font:600 13px var(--body);color:var(--fg);margin:0}
 }
+.apercu-direct{display:grid;align-content:center;gap:16px;min-height:min(570px,calc(100svh - 210px));padding:18px 6px}.apercu-direct strong{font:800 clamp(40px,12vw,68px) var(--display)}.apercu-direct div{display:flex;gap:48px}.apercu-direct span,.apercu-direct small{color:var(--muted)}.apercu-direct b{display:block;color:var(--fg);font-size:24px}.apercu-direct a{color:var(--cyclom);padding:12px 0}#detail-direct{scroll-margin-top:125px;height:0}
 </style>
 
 <header class="top">
@@ -1248,7 +1249,7 @@ const guideTxt = g => !g ? '' : `<b>${g.n} vidéo${g.n > 1 ? 's' : ''}</b>${g.jo
 // course au classement Cyclom (top 10 payé). Source : RAW.classement (serveur) ou fichier Drive cyclom_classement.json (CLASSEMENT),
 // format { campagnes:[{ id, nom, tag, fin, prix:{vues,posts,bonus}, lignes:[{ pseudo, comptes, rv, rp, vues, clips, meilleur, gain }] }] }.
 let CLASSEMENT = null;
-function mesComptesTT(A) { return new Set([...(A.user || '').split(' + '), ...RAW.comptes.map(c => c.user)].filter(Boolean).map(x => String(x).toLowerCase())); }
+function mesComptesTT(A) { return new Set([...(A.user || '').split(' + '), ...(A.id === 'tous' ? RAW.comptes.map(c => c.user) : [])].filter(Boolean).map(x => String(x).toLowerCase())); }
 function courses(A) {
   const src = RAW.classement || CLASSEMENT; if (!src?.campagnes) return [];
   const moi = mesComptesTT(A), out = [];
@@ -1330,7 +1331,7 @@ function course(A, C, mode) {
           ? `<span class="jg-l">${fini ? '1er provisoire' : 'Tu es en tête'}</span><b class="num jg-big">${avance != null ? '+' + k(avance) : '—'}</b><span class="jg-s">${avance != null ? `${unite} d’avance sur le 2e` : ''}</span>`
           : `<span class="jg-l">${fini ? 'Il manquait (provisoire)' : 'Il te manque'} pour passer ${ord(placeCible)}</span><b class="num jg-big">${k(manqueC)} ${unite}</b>${gainC > 0 ? `<span class="jg-gain">+${eur(gainC)}</span>` : ''}`}</div>
       </div>${vit}
-      <div class="jg-pied">${fin2 ? `<span>${fin2}</span>` : ''}<span class="${vieux ? 'down' : 'muted'}">${vieux ? 'Classement pas à jour depuis ' + ago(mj).replace('il y a ', '') : 'Validé cyclom.fr · ' + ago(mj)}</span></div>`;
+      <div class="jg-pied">${fin2 ? `<span>${fin2}</span>` : ''}<span class="${vieux ? 'down' : 'muted'}">${vieux ? 'Classement pas à jour depuis ' + ago(mj).replace('il y a ', '') : 'Relevé cyclom.fr · ' + ago(mj)}</span></div>`;
     if (mode === 'complet' && g && !fini) h += `<p class="say jg-guide">Pour y arriver : ${guideTxt(g)}</p>`;
     if (mode === 'complet') {
       const top = x.tri.slice(0, Math.max(10, x.prixL.length)), lignes = top.includes(x.moi) ? top : [...top, x.moi];
@@ -1461,6 +1462,10 @@ function vDirect(A, C) {
   if ((SITE || DRIVE) && Date.now() - RAW.maj > (DRIVE ? 20 : 45) * 60000) h += `<div class="warnbox">Le dernier relevé date de ${ago(RAW.maj).replace('il y a ', '')} : les chiffres du jour peuvent être en dessous de la réalité.</div>`;
   h += bandeaux();
   
+  const active = courses(A).find(c => c.type === 'vues' && c.fin > Date.now());
+  const place = active ? active.tri.indexOf(active.moi) + 1 : null;
+  const jour = C.P.day === pz(Date.now()).day ? 'du jour' : 'du ' + dayLabel(C.P.day);
+  h += `<section class="apercu-direct"><h2>Coup d’œil</h2><small>Vues ${jour}${C.partiel ? ' · relevé partiel' : ''}</small><strong class="num">${fmt(C.today)}</strong><div><span>Place provisoire<b>${place ? place + (place === 1 ? 'er' : 'e') : '—'}</b></span><span>Série<b>${serie(A,C)} j</b></span></div><a href="#detail-direct">Voir le détail ↓</a></section><div id="detail-direct"></div>`;
   h += navJour(C.P.day, A, C, 'djour');
 
   h += `<section class="card hero">
