@@ -1321,10 +1321,10 @@ function course(A, C, mode) {
       else if (derriere && avance != null) L2.push(`<span>▼ ${k(avance)} ${unite} d’avance sur le ${ord(place + 1)}</span>`);
       vit = L2.length ? `<div class="jg-vit">${L2.join('')}</div>` : '';
     }
-    const fin2 = reste == null ? '' : fini ? 'Terminée · officiel après vérif Cyclom' : `Fin dans <b class="num" data-fin="${x.fin}">${resteTxt(reste)}</b> · place provisoire`;
+    const fin2 = reste == null ? '' : fini ? 'Classement relevé à la fin · montant à confirmer' : `Fin dans <b class="num" data-fin="${x.fin}">${resteTxt(reste)}</b> · place provisoire`;
     const mj = new Date((RAW.classement || CLASSEMENT).maj).getTime(), vieux = Date.now() - mj > 3 * 3600e3;
     let h = `<section class="card money course jauge ${sprint ? 'sprint' : ''} ${fini ? 'finie' : ''}">
-      <div class="jg-h"><span class="jg-nom">${esc(x.nom)}${x.type === 'clips' ? ' · clips' : ''}</span>${sprint ? '<span class="jg-badge">SPRINT</span>' : fini ? '<span class="jg-badge off">En vérification</span>' : ''}<b class="num jg-prix">${titre}</b></div>
+      <div class="jg-h"><span class="jg-nom">${esc(x.nom)}${x.type === 'clips' ? ' · clips' : ''}</span>${sprint ? '<span class="jg-badge">SPRINT</span>' : fini ? '<span class="jg-badge off">Terminée</span>' : ''}<b class="num jg-prix">${titre}</b></div>
       <div class="jg-corps">
         <svg class="jg-anneau ${anim ? 'anim' : ''}" viewBox="0 0 80 80" aria-hidden="true" style="--p:${P.toFixed(1)};--o:${(P * (1 - pc)).toFixed(1)}"><circle cx="40" cy="40" r="${R}" class="jg-fond"/><circle cx="40" cy="40" r="${R}" class="jg-arc" stroke-dasharray="${P.toFixed(1)}" stroke-dashoffset="${(P * (1 - pc)).toFixed(1)}" transform="rotate(-90 40 40)"/><text x="40" y="40" class="jg-pl">${ord(place)}</text><text x="40" y="55" class="jg-pc">${place === 1 ? 'en tête' : Math.round(pc * 100) + ' %'}</text></svg>
         <div class="jg-txt">${place === 1
@@ -1778,7 +1778,7 @@ function vCampagnes(A, C) {
   const tot = A.videos.reduce((s, v) => s + v.v, 0) || 1;
   const G = gains(A);
   let h = course(A, C, 'complet');
-  for (const c of infosCampagnes()) h += blocCartons(c, A) + blocMeilleurs(A, c);
+  for (const c of infosCampagnes()) if (A.videos.some(v => tags(v.d).includes(c.tag))) h += blocCartons(c, A) + blocMeilleurs(A, c);
   h += `<div class="sec-h"><h2>Tes campagnes Cyclom</h2><small>via tes hashtags</small></div>`;
   if (!list.length) return h + `<div class="card muted">Aucune vidéo avec un hashtag de campagne (#cyclomx…) pour l'instant.</div>`;
   for (const c of list) {
