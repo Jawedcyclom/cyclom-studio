@@ -517,6 +517,27 @@ button,a.link,a.ext,.vc,.row,.in,.camp,.cd,.rc,.hb{transition:transform .15s var
   .sheet .kv{grid-template-columns:repeat(3,minmax(0,1fr))}
   .sheet .vd{grid-template-columns:150px minmax(0,1fr)}.sheet .vd img,.sheet .vd .ph{width:150px}
 }
+/* ===== TÉLÉPHONE ÉPURÉ (Jawed 24/11) : façon Apple / TikTok, une ligne par section, on touche pour ouvrir ===== */
+.podium-tout{display:none}
+@media (max-width:959px){
+  .sec.pliable>.sec-h{cursor:pointer;align-items:center;flex-wrap:nowrap;min-height:44px;padding-right:26px;position:relative;-webkit-tap-highlight-color:transparent}
+  .sec.pliable>.sec-h::after{content:'';position:absolute;right:6px;top:50%;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);transition:transform .2s}
+  .sec.pliable.ouvert>.sec-h::after{transform:translateY(-30%) rotate(-135deg)}
+  .sec.pliable>.sec-h small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;text-align:right}
+  .sec.pliable:not(.ouvert)>:not(.sec-h){display:none!important}
+  .sec.pliable:not(.ouvert){gap:0}
+  .sec.pliable:not(.ouvert):not(.card){padding:4px 14px;border:1px solid var(--edge);border-radius:16px;background:var(--panel)}
+  .sec.pliable:not(.ouvert).card{padding-top:8px;padding-bottom:8px}
+  /* chiffres du jour : une seule rangée qu'on fait glisser au lieu de 2 lignes de cases */
+  .tiles{display:flex;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px}
+  .tiles::-webkit-scrollbar{display:none}
+  .tiles>.tile{flex:0 0 31%;scroll-snap-align:start}
+  /* classement : le haut + toi, le reste sur demande */
+  .podium-tout{display:block;margin-top:8px}
+  .course:not(.tout) .pl:nth-child(n+4):not(.moi){display:none}
+  /* campagnes : la carte = nom + 3 chiffres, les miniatures sont dans la liste des vidéos */
+  .camp .strip,.camp .sumbar{display:none}
+}
 </style>
 
 <header class="top">
@@ -695,7 +716,7 @@ function course(A, C, mode) {
       <div class="muted" style="font-size:12.5px">${finTxt ? finTxt + ' ' : ''}${(() => { const mj = new Date((RAW.classement || CLASSEMENT).maj).getTime(), vieux = Date.now() - mj > 3 * 3600e3; return `${vieux ? '<b class="down">Classement pas mis à jour depuis ' + ago(mj).replace('il y a ', '') + '.</b> ' : ''}Place selon les vues validées par cyclom.fr (tout est recompté avant le paiement), relevé ${ago(mj)}.`; })()}</div>`;
     if (mode === 'complet') {
       const top = x.tri.slice(0, Math.max(10, x.prixL.length)), lignes = top.includes(x.moi) ? top : [...top, x.moi];
-      h += `<div class="podium">${lignes.map(r => { const p = x.tri.indexOf(r) + 1; return `<div class="pl ${r === x.moi ? 'moi' : ''}"><span class="pr">${p}</span><span class="pp">${r === x.moi ? 'Toi' : 'Clippeur ' + p}</span><span class="pv num">${k(val(r))}</span><span class="pg num">${prix(p) ? eur(prix(p)) : ''}</span></div>`; }).join('')}</div>`;
+      h += `<div class="podium">${lignes.map(r => { const p = x.tri.indexOf(r) + 1; return `<div class="pl ${r === x.moi ? 'moi' : ''}"><span class="pr">${p}</span><span class="pp">${r === x.moi ? 'Toi' : 'Clippeur ' + p}</span><span class="pv num">${k(val(r))}</span><span class="pg num">${prix(p) ? eur(prix(p)) : ''}</span></div>`; }).join('')}</div>${lignes.length > 4 ? '<button class="more podium-tout" type="button" data-podium>Voir tout le classement</button>' : ''}`;
     }
     return h + `</section>`;
   }).join('');
@@ -1614,8 +1635,30 @@ function render() {
   const A = compteCourant(), C = calc(A);
   const V = { direct: vDirect, videos: vVideos, campagnes: vCampagnes, historique: vHistorique, creneaux: vCreneaux };
   $('#main').innerHTML = V[VIEW](A, C);
+  replier();
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.v === VIEW));
 }
+// Téléphone (Jawed 24/11 : « trop de gros trucs dès qu'on ouvre une page ») : façon Apple / TikTok, chaque section
+// devient une ligne (titre + résumé + ›) qu'on touche pour l'ouvrir. L'essentiel (le gros chiffre) reste ouvert. PC inchangé.
+const OUVERTS = new Set((() => { try { return JSON.parse(localStorage.getItem('cs_ouverts') || '[]'); } catch (e) { return []; } })());
+function replier() {
+  if (!matchMedia('(max-width:959px)').matches) return;
+  let premier = VIEW === 'creneaux'; // Analyse : la 1re section du sous-onglet reste ouverte (sinon la page paraît vide)
+  for (const s of $('#main').querySelectorAll('section.sec')) {
+    const h = s.querySelector(':scope > .sec-h'), t = h?.querySelector('h2')?.textContent.trim();
+    if (!t || s.classList.contains('login')) continue;
+    if (premier) { premier = false; continue; }
+    const cle = VIEW + ':' + t, o = OUVERTS.has(cle);
+    s.classList.add('pliable'); s.classList.toggle('ouvert', o);
+    h.dataset.plier = cle; h.setAttribute('role', 'button'); h.tabIndex = 0; h.setAttribute('aria-expanded', String(o));
+  }
+}
+function basculerSection(h) {
+  const s = h.parentElement, o = s.classList.toggle('ouvert'), cle = h.dataset.plier;
+  h.setAttribute('aria-expanded', String(o)); o ? OUVERTS.add(cle) : OUVERTS.delete(cle);
+  try { localStorage.setItem('cs_ouverts', JSON.stringify([...OUVERTS])); } catch (e) {}
+}
+document.addEventListener('keydown', e => { const h = e.target.closest?.('[data-plier]'); if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); basculerSection(h); } });
 function rendreDoux(avant) {
   const y = window.scrollY, old = avant ? $('#main .big')?.textContent : null;
   render(); window.scrollTo({ top: y });
@@ -1631,7 +1674,9 @@ function go(v, haut) { if (v === VIEW && !haut) { if (v === 'direct' && st.jour)
 document.addEventListener('click', e => {
   const hr = e.target.closest('[data-hour]'); if (hr) { const h = +hr.getAttribute('data-hour'); st.hourSel = st.hourSel === h ? null : h; return render(); }
   const tr = e.target.closest('tr[data-day]'); if (tr) return ficheJour(tr.dataset.day);
+  const pl = e.target.closest('[data-plier]'); if (pl && !e.target.closest('[data-plier] button, [data-plier] a')) return basculerSection(pl);
   const t = e.target.closest('button,[data-close],a'); if (!t) return;
+  if (t.hasAttribute('data-podium')) { const s = t.closest('.course'), o = s.classList.toggle('tout'); t.textContent = o ? 'Réduire le classement' : 'Voir tout le classement'; return; }
   if (t.hasAttribute('data-close') && (t.classList.contains('x') || e.target === t)) return fermer();
   if (t.classList.contains('tab')) return go(t.dataset.v);
   if (t.dataset.acc) { ACC = t.dataset.acc; save(); return render(); }
@@ -1679,7 +1724,7 @@ document.addEventListener('click', e => {
   if (t.dataset.sp) { st.slotPer = +t.dataset.sp; st.slotSel = null; return render(); }
   if (t.dataset.slot) return ficheGroupe('slot', t.dataset.slot);
   if (t.dataset.grp) { const [g, i] = t.dataset.grp.split(':'); return ficheGroupe(g, i); }
-  if (t.id === 'heatTog') { st.heat = !st.heat; return render(); }
+  if (t.id === 'heatTog') { st.heat = !st.heat; if (st.heat) OUVERTS.add(VIEW + ':Jour × heure'); return render(); } // demandé exprès = ouvert
 });
 document.addEventListener('input', e => { if (e.target.id === 'q') { st.q = e.target.value; st.shown = 60; const pos = e.target.selectionStart; render(); const i = $('#q'); i.focus(); try { i.setSelectionRange(pos, pos); } catch (x) {} } });
 document.addEventListener('change', e => { const id = e.target.id, v = e.target.value;
