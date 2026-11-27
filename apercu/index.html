@@ -848,6 +848,7 @@ button,a,[role="button"],.sec.pliable{-webkit-touch-callout:none}
 .nv-sem i.on{background:#ff8a3d;border-color:#ff8a3d;color:#1b0b00}
 .nv-sem i.auj:not(.on){border-color:#ffb547;color:#ffb547}
 .nv-sem i.fut{opacity:.35}
+.nv-sem i.mi,.nv-cal i.mi{background:linear-gradient(0deg,rgba(255,138,61,.55) 50%,transparent 50%);border-color:rgba(255,138,61,.6)}
 @media (max-width:380px){.nv-sem i{width:15px;height:15px;font-size:8.5px;border-radius:5px}.nv-big b{font-size:30px}}
 .acct.nv-chip{display:inline-flex;align-items:center;gap:4px;font:800 14px var(--display);font-variant-numeric:tabular-nums;padding-left:10px;padding-right:12px}
 .acct.nv-chip .flamme{width:18px;height:18px}
@@ -1608,6 +1609,17 @@ html.neon:not(.studio) :is(.note,.an-base,.an-d.muted,.sec-h small,.tile small,.
 .day-card>.daynav{margin:0 0 18px;padding:0 0 12px;border-bottom:1px solid var(--edge);background:none;box-shadow:none;border-radius:0}
 .day-card>.day-title{margin:0 0 12px;font:600 16px/1.4 var(--body);color:var(--fg);letter-spacing:-.015em}
 @media(max-width:959px){.card.hero.day-card{padding:16px!important}.day-card>.daynav{margin:0 0 16px}.day-card>.day-title{font-size:15px}}
+/* ===== FIN DES AUDITS (27/11) : F08 / F09 / F13 ===== */
+/* F13 : la barre du bas et l'en-tête ne cachent jamais l'élément visé (Tab, ancre, retour) */
+html{scroll-padding-top:calc(var(--toph,64px) + 8px);scroll-padding-bottom:calc(var(--tabh,58px) + 24px + env(safe-area-inset-bottom,0px))}
+/* F09 : même retour au clavier qu'à la souris, seulement sur ce qui se clique */
+html.neon :is(.row,.cp-row,.jr,.an-rk button,.hb:not(:disabled)):focus-visible{filter:brightness(1.12)}
+html.neon :is(.mr,.vc,.ic2):focus-visible img{transform:scale(1.04)}
+html.neon :is(button,a,[data-fm],[data-vid],[data-day]):active{transition-duration:.09s}
+@media (hover:hover) and (pointer:fine){html.neon :is(a.row,button.row,.cp-row,.jr,[data-vid].row,[data-day].row):hover{background-color:rgba(255,255,255,.04)}}
+/* F08 : la courbe prise au clavier se voit */
+svg[data-gx]:focus{outline:none}
+svg[data-gx]:focus-visible{outline:2px solid rgba(82,240,222,.85)!important;outline-offset:4px;border-radius:10px}
 </style>
 
 <header class="top">
@@ -1693,6 +1705,7 @@ const dayLabel = d => { const dt = new Date(+d.slice(0, 4), +d.slice(4, 6) - 1, 
 const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); if (m < 1) return "à l'instant"; if (m < 60) return 'il y a ' + m + ' min'; const h = Math.floor(m / 60); if (h < 24) return 'il y a ' + h + ' h'; return 'il y a ' + Math.floor(h / 24) + ' j'; };
 const dateVid = t => new Date(t * 1000).toLocaleString('fr-FR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(' ', ' à ');
 const tags = d => (String(d || '').toLowerCase().match(/#[\p{L}\p{N}_]+/gu) || []).map(t => t.slice(1));
+const estCyclom = v => tags(v.d).some(t => t.includes('cyclom')); // Historique : seulement les vidéos avec un hashtag cyclom (Jawed 27/11)
 const casse = t => t && t === t.toUpperCase() && /[A-Z]{4}/.test(t) ? t.toLowerCase().replace(/(^|[\s\-—(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : t;
 const titreSansDate = v => titreVid(v).replace(/ · \d\d\/\d\d à \d\d:\d\d$/, ''); // pour les lignes qui affichent déjà la date à droite
 const titreVid = v => { const t = sansTags(v.d); if (t) return t; const c = tags(v.d).find(x => x.startsWith('cyclomx'));
@@ -1868,8 +1881,13 @@ function course(A, C, mode) {
 // série : jours d'affilée avec au moins une vidéo postée (aujourd'hui compte s'il y en a déjà une)
 // jour qui compte pour la série : le VRAI jour (relevé d'hier encore affiché après minuit → aujourd'hui n'a encore rien)
 const jourSerie = C => { const r = pz(Date.now()).day; return r > C.P.day ? r : C.P.day; };
+// Jawed 27/11 : pousser à poster PLUSIEURS vidéos par jour → un jour ne compte pour la série qu'avec au moins MIN_JOUR vidéos
+const MIN_JOUR = 3;
+const parJour = A => { const m = new Map(); for (const v of A.videos) { const d = pz(v.t * 1000).day; m.set(d, (m.get(d) || 0) + 1); } return m; };
+const joursPleins = A => new Set([...parJour(A)].filter(([, n]) => n >= MIN_JOUR).map(([d]) => d));
+const pluriel = (n, m) => n + ' ' + m + (n > 1 ? 's' : '');
 function serie(A, C) {
-  const jours = new Set(A.videos.map(v => pz(v.t * 1000).day)), J0 = jourSerie(C); let d = jours.has(J0) ? J0 : addJour(J0, -1), n = 0;
+  const jours = joursPleins(A), J0 = jourSerie(C); let d = jours.has(J0) ? J0 : addJour(J0, -1), n = 0;
   while (jours.has(d) && n < 999) { n++; d = addJour(d, -1); } return n;
 }
 
@@ -1950,7 +1968,7 @@ function calc(A) {
   const f = median(fr);
   const est = !partiel && f && f > 0.04 ? today / f : null;
   // normale par âge : médiane des vues à 1/3/6/12/24 h
-  const msMed = {}; for (const m of ['1','3','6','12','24']) msMed[m] = median(A.videos.slice(0, 300).map(v => v.ms?.[m]).filter(x => x > 0));
+  const msMed = {}; for (const m of ['1','3','6','12','24']) msMed[m] = median(A.videos.slice(0, 300).map(v => v.ms?.[m]).filter(x => Number.isFinite(x) && x >= 0)); // AN-05 : un 0 mesuré compte, une absence non
   const vieux = A.videos.filter(v => now / 1000 - v.t > 2 * 86400).slice(0, 60);
   const normal = median(vieux.map(v => v.v));
   const attendu = age => { let m = null; for (const x of ['1','3','6','12','24']) if (age >= +x && msMed[x]) m = x;
@@ -2001,7 +2019,7 @@ function coupOeil(A, C) {
   else tP = `<div class="oeil-t"><span class="oeil-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l5-6 4 3 7-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b class="num">${C.est && !C.partiel ? '≈ ' + k(C.est) : '—'}</b><small>vues prévues ce soir</small></div>`;
   let tS = '';
   try { const S = NV.infosSerie(A, C);
-    tS = `<button class="oeil-t feu ${S.auj ? 'ok' : 'danger'}" type="button" data-serie aria-label="Ta série : ${S.n} jours"><span class="oeil-ic">${!S.n && A.videos[0] ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' : NV.FLAMME}</span>${!S.n && A.videos[0] ? `<b class="num">${Math.floor((C.now / 1000 - A.videos[0].t) / 3600)}\u00a0h</b><small>sans poster</small>` : `<b class="num">${S.n} j</b><small>${S.auj ? 'série gardée' : 'poste avant minuit'}</small>`}</button>`; }
+    tS = `<button class="oeil-t feu ${S.auj ? 'ok' : 'danger'}" type="button" data-serie aria-label="Ta série : ${S.n} jours"><span class="oeil-ic">${!S.n && A.videos[0] && !S.postAuj ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' : NV.FLAMME}</span>${!S.n && A.videos[0] && !S.postAuj ? `<b class="num">${Math.floor((C.now / 1000 - A.videos[0].t) / 3600)}\u00a0h</b><small>sans poster</small>` : `<b class="num">${S.n} j</b><small>${S.auj ? 'série gardée' : `${S.postAuj}/${MIN_JOUR} · encore ${S.reste}`}</small>`}</button>`; }
   catch (e) { tS = `<button class="oeil-t feu" type="button" data-serie><b class="num">${serie(A, C)} j</b><small>Série</small></button>`; }
   return `<section class="oeil" aria-label="Coup d’œil"><p class="oeil-j">${jour}${C.partiel ? ' · relevé partiel' : ''}</p>
     <button class="oeil-big" type="button" data-fm="g" style="--r:${C.yTot ? Math.min(1, C.today / C.yTot).toFixed(3) : 0}" data-r="${C.yTot ? Math.round(100 * C.today / C.yTot) : ""}" aria-label="Détail des vues"><b class="num">${fmt(C.today)}</b><span>vues ›</span></button>${delta ? delta.replace('</p>', (hier ? ' · ' + hier : '') + '</p>') : hier ? `<p class="oeil-d">${hier}</p>` : ''}
@@ -2043,15 +2061,15 @@ function vDirect(A, C) {
   h += `<div class="tiles">
     <button class="tile" type="button" data-fm="h"><span>Vues · 1 h</span><b class="num">${A.heure?.gained != null ? '+' + k(A.heure.gained) : '—'}</b></button>
     <button class="tile" type="button" data-fm="f"><span>Abonnés</span><b class="num ${A.abonnes_jour > 0 ? 'up' : ''}">${A.abonnes_jour != null ? (A.abonnes_jour >= 0 ? '+' : '') + fmt(A.abonnes_jour) : '—'}</b><small class="muted">${k(A.abonnes)} total</small></button>
-    ${nb ? `<button class="tile" type="button" data-fm="p"><span>Postées</span><b class="num">${nb}</b><small class="muted">${(() => { const sr = serie(A, C); return sr >= 2 ? `série ${sr} j` : ''; })()}</small></button>`
-      : `<button class="tile" type="button" data-fm="p"><span>Postées</span><b class="num">0</b><small class="muted">rien aujourd’hui</small></button>`}
+    ${nb ? `<button class="tile" type="button" data-fm="p"><span>Postées</span><b class="num" style="white-space:nowrap">${nb}<span style="font-size:.5em;opacity:.6;font-weight:600"> / ${MIN_JOUR}</span></b><small class="muted">${nb >= MIN_JOUR ? (() => { const sr = serie(A, C); return sr >= 2 ? `série ${sr} j` : 'minimum atteint'; })() : `encore ${MIN_JOUR - nb}`}</small></button>`
+      : `<button class="tile" type="button" data-fm="p"><span>Postées</span><b class="num" style="white-space:nowrap">0<span style="font-size:.5em;opacity:.6;font-weight:600"> / ${MIN_JOUR}</span></b><small class="muted">minimum ${MIN_JOUR} par jour</small></button>`}
     <button class="tile" type="button" data-fm="l"><span>Likes</span><b class="num">${Q.l != null ? '+' + k(Q.l) : '—'}</b></button>
     <button class="tile" type="button" data-fm="s"><span>Partages</span><b class="num">${Q.s != null ? '+' + k(Q.s) : '—'}</b></button>
     ${(() => { const G = gains(A); return G ? `<button class="tile" type="button" data-go="campagnes" style="text-align:left"><span>Gagné</span><b class="num" style="color:var(--gold)">${eur(G.auj)}</b></button>`
       : `<button class="tile" type="button" data-fm="c"><span>Comms</span><b class="num">${Q.c != null ? '+' + k(Q.c) : '—'}</b></button>`; })()}
   </div>`;
   // une seule liste avec deux vues : ce qui monte maintenant / postées aujourd'hui (moins de scroll)
-  const dj = [...C.duJour].sort((a, b) => b.t - a.t);
+  const dj = C.duJour.filter(estCyclom).sort((a, b) => b.t - a.t);
   const rise = A.videos.filter(v => v.gh > 0).sort((a, b) => b.gh - a.gh).slice(0, 5);
   const topJ = A.videos.filter(v => v.gj > 0).sort((a, b) => b.gj - a.gj).slice(0, 5);
   const lst = rise.length ? rise : topJ, vue = (st.dvue === 'postees' && C.duJour.length) || !lst.length ? 'postees' : 'monte';
@@ -2125,11 +2143,11 @@ function phrase(A, C) {
 function vJourPasse(A, C, d) {
   const Q = A.quotidien || {}, q = Q[d] || {}, pd = addJour(d, -1), p = Q[pd];
   const dv = q.g != null && p?.g ? pct(q.g, p.g) : null, df = q.f != null && p?.f != null ? q.f - p.f : null;
-  const vs = A.videos.filter(v => pz(v.t * 1000).day === d).sort((a, b) => b.t - a.t);
+  const vs = A.videos.filter(v => pz(v.t * 1000).day === d && estCyclom(v)).sort((a, b) => b.t - a.t);
   const nb = vs.length, H = A.horaire || {};
   const aHeures = Array.from({ length: 24 }, (_, h) => H[d + String(h).padStart(2, '0')]).some(x => x != null);
   // ce qui a rapporté ce jour-là : vues de fin de journée de chaque vidéo (vd)
-  const gains = A.videos.map(v => { if (!v.vd || v.vd[d] == null) return null; const ks = Object.keys(v.vd).sort(), i = ks.indexOf(d);
+  const gains = A.videos.map(v => { if (!v.vd || v.vd[d] == null || !estCyclom(v)) return null; const ks = Object.keys(v.vd).sort(), i = ks.indexOf(d);
     const avant = i > 0 ? v.vd[ks[i - 1]] : pz(v.t * 1000).day === d ? 0 : null; return avant == null ? null : { v, g: v.vd[d] - avant }; })
     .filter(x => x && x.g > 0 && !(x.v.v >= 1e6 && x.g % 1e5 === 0)) // palier d'arrondi TikTok (1,2 M → 1,3 M) : pas un vrai gain du jour
     .sort((a, b) => b.g - a.g).slice(0, 8);
@@ -2153,7 +2171,7 @@ function vJourPasse(A, C, d) {
     <div class="legend"><span><i style="background:var(--accent)"></i>${d === C.yd ? 'Hier' : 'Ce jour'}</span><span><i style="background:#5a5a66"></i>${d === C.yd ? 'Avant-hier' : 'Veille'}</span></div></section>`;
   if (gains.length) h += `<section class="sec"><div class="sec-h"><h2>Ce qui a rapporté ce jour-là</h2><small>vues gagnées dans la journée</small></div>
     <div class="rows">${gains.map(({ v, g }) => `<button class="row" type="button" data-vid="${v.id}">${cover(v)}<div class="t"><b class="num">+${k(g)}</b><span>${esc(titreSansDate(v))}</span></div><div class="r num"><b>${k(v.v)}</b><br><span class="muted">${dateVid(v.t)}</span></div></button>`).join('')}</div></section>`;
-  h += `<section class="sec"><div class="sec-h"><h2>Postées ce jour-là</h2><small>${nb} vidéo${nb > 1 ? 's' : ''} · ${k(vs.reduce((s, v) => s + v.v, 0))} vues à ce jour</small></div>`;
+  h += `<section class="sec"><div class="sec-h"><h2>Vidéos Cyclom ce jour-là</h2><small>${nb} vidéo${nb > 1 ? 's' : ''} · ${k(vs.reduce((s, v) => s + v.v, 0))} vues à ce jour</small></div>`;
   h += nb ? `<div class="grid">${vs.slice(0, 30).map(v => vcard(v, C)).join('')}</div>` : `<div class="card muted">Aucune vidéo postée ce jour-là.</div>`;
   if (nb > 30) h += `<button class="more" type="button" data-go="videos" data-per="d:${d}">Voir les ${nb} vidéos de ce jour</button>`;
   h += `</section><button class="more" type="button" data-dj="${C.P.day}" data-for="djour">Revenir à aujourd'hui</button>`;
@@ -2392,15 +2410,15 @@ function vHistorique(A, C) {
   const pp = st.hPer && periodeComplete && actuel != null && precedent > 0 ? pct(actuel, precedent) : null;
   h += `<section class="card sec chart"><div class="sec-h"><div><div class="muted" style="font-size:13px">${actuel != null && clos.length ? `${lab} sur ${clos.length} jour${clos.length > 1 ? 's' : ''} terminé${clos.length > 1 ? 's' : ''}` : `${lab} sur la période`}</div><div style="font:800 28px var(--display)" class="num">${fmt(actuel != null && clos.length ? actuel : tot)}</div>${sel.includes(C.P.day) && get(C.P.day) != null && actuel != null ? `<div class="muted" style="font-size:12.5px;margin-top:2px">+ aujourd’hui en cours : ${fmt(get(C.P.day))}</div>` : ''}</div>
     ${pp != null ? `<span class="pill ${pp >= 0 ? 'g' : 'b'}">${pctTxt(pp)} vs les ${clos.length} jours d’avant</span>` : ''}</div>${barres(sel, vals)}</section>`;
-  const nbv0 = {}; for (const v of A.videos) { const d = pz(v.t * 1000).day; nbv0[d] = (nbv0[d] || 0) + 1; }
+  const nbv0 = {}; for (const v of A.videos) { if (!estCyclom(v)) continue; const d = pz(v.t * 1000).day; nbv0[d] = (nbv0[d] || 0) + 1; }
   if (innerWidth < 700) {
     h += `<div class="jours">${[...sel].reverse().map(d => { const q = Q[d], p = Q[addJour(d, -1)], dv = p && d !== C.P.day && !q._p && !p._p ? pct(q.g, p.g) : null, df = q.f != null && p?.f != null ? q.f - p.f : null;
       return `<button class="jr" type="button" data-day="${d}"><span class="jd"><b>${dayLabel(d)}</b><small>${nbv0[d] || 0} vidéo${(nbv0[d] || 0) > 1 ? 's' : ''}${df != null ? ` · ${df >= 0 ? '+' : ''}${fmt(df)} abonnés` : ''}</small></span><span class="jv"><b class="num">${k(q.g)}</b>${d === C.P.day ? '<small class="muted">en cours</small>' : ''}${q._p ? `<small class="muted">partiel · ${q._p} comptes</small>` : ''}${dv != null ? `<small class="${dv >= 0 ? 'up' : 'down'}">${pctTxt(dv)}</small>` : ''}</span><span class="chev">›</span></button>`; }).join('')}</div>
       <p class="muted note-c">Touche un jour pour le détail · jour en cours partiel · jours finis : TikTok Studio · aujourd'hui : relevé 5 min</p>`;
     return h;
   }
-  h += `<div class="tbl-wrap"><table><thead><tr><th>Jour</th><th>Vues</th><th>Abonnés</th><th>Likes</th><th>Partages</th><th>Comms</th><th>Vidéos</th></tr></thead><tbody>`;
-  const nbv = {}; for (const v of A.videos) { const d = pz(v.t * 1000).day; nbv[d] = (nbv[d] || 0) + 1; }
+  h += `<div class="tbl-wrap"><table><thead><tr><th>Jour</th><th>Vues</th><th>Abonnés</th><th>Likes</th><th>Partages</th><th>Comms</th><th>Vidéos Cyclom</th></tr></thead><tbody>`;
+  const nbv = {}; for (const v of A.videos) { if (!estCyclom(v)) continue; const d = pz(v.t * 1000).day; nbv[d] = (nbv[d] || 0) + 1; }
   for (const d of [...sel].reverse()) { const q = Q[d], i = days.indexOf(d), p = Q[addJour(d, -1)];
     const dv = p && d !== C.P.day ? pct(q.g, p.g) : null; const df = q.f != null && p?.f != null ? q.f - p.f : null;
     h += `<tr data-day="${d}"><td>${dayLabel(d)} <span class="muted">›</span></td><td class="num">${fmt(q.g)}${dv != null ? `<small class="${dv >= 0 ? 'up' : 'down'}">${pctTxt(dv)}</small>` : ''}</td><td class="num">${df != null ? (df >= 0 ? '+' : '') + fmt(df) : '—'}${q.f ? `<small class="muted">${fmt(q.f)}</small>` : ''}</td><td class="num">${fmt(q.l)}</td><td class="num">${fmt(q.s)}</td><td class="num">${fmt(q.c)}</td><td class="num">${nbv[d] || 0}</td></tr>`; }
@@ -2408,15 +2426,15 @@ function vHistorique(A, C) {
   return h;
 }
 function barres(days, vals, feuille) {
-  const W = CW(feuille), Ht = W > 600 ? 210 : 160, pl = 36, pb = 22, pt = 10, n = days.length || 1;
+  const W = CW(feuille), Ht = W > 600 ? 210 : 160, pl = 6, pr = 44, pb = 22, pt = 10, n = days.length || 1;
   const mx = Math.max(1, ...vals.filter(x => x != null).map(Math.abs));
   const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(mx))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= mx) return m * p; return 10 * p; })();
   const signe = vals.some(v => v < 0);
-  const bw = (W - pl) / n;
+  const bw = (W - pl - pr) / n;
   const y = v => pt + (Ht - pt - pb) * (1 - v / nice) / (signe ? 2 : 1);
   const zero = y(0);
   let s = `<svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Barres par jour"${gxAttr({ W, px: days.map((d, i) => pl + i * bw + bw / 2), py: vals.map(v => v == null ? null : +y(Math.max(0, v)).toFixed(1)), lab: days.map(dayLabel), val: vals, mode: 'somme', bw: +bw.toFixed(1) })}>`;
-  for (const g of (signe ? [-1, 0, 1] : [0, .5, 1])) { const yy = y(nice * g); s += `<line x1="${pl}" x2="${W}" y1="${yy}" y2="${yy}" stroke="rgba(255,255,255,.07)"/><text x="${pl - 5}" y="${yy + 3.5}" text-anchor="end" font-size="9.5" fill="#7f7f8b">${k(nice * g)}</text>`; }
+  for (const g of (signe ? [-1, 0, 1] : [0, .5, 1])) { const yy = y(nice * g); s += `<line x1="${pl}" x2="${W - pr + 6}" y1="${yy}" y2="${yy}" stroke="rgba(255,255,255,${g === 0 ? .14 : .06})"/><text x="${W - 2}" y="${yy + 3.5}" text-anchor="end" font-size="10" fill="#8a9aae">${k(nice * g)}</text>`; }
   const step = Math.ceil(n / 7);
   days.forEach((d, i) => { const v = vals[i]; const x = pl + i * bw;
     if (v != null && v !== 0) s += `<rect x="${x + bw * .15}" y="${Math.min(zero, y(v))}" width="${bw * .7}" height="${Math.abs(zero - y(v))}" rx="2.5" fill="${v < 0 ? '#ff7a93' : i === n - 1 ? '#fe2c55' : '#52f0de'}"/>`;
@@ -2471,9 +2489,9 @@ function signalPrecoce(A, C) {
   return recentes.map(v => {
     const age = (now - v.t) / 3600; let m = null; for (const x of JAL) if (+x <= age && v.ms?.[x] != null) m = x;
     const val = m ? v.ms[m] : null; if (val == null) return null;
-    const pairs = base.filter(b => b.id !== v.id && b.ms[m] > 0 && b.ms['24'] > 0);
+    const pairs = base.filter(b => b.id !== v.id && Number.isFinite(b.ms[m]) && b.ms[m] >= 0 && b.ms['24'] > 0), divs = pairs.filter(b => b.ms[m] > 0);
     if (pairs.length < 12) return null;
-    const p = rangPct(pairs.map(b => b.ms[m]), val), pred = val * median(pairs.map(b => b.ms['24'] / b.ms[m]));
+    const p = rangPct(pairs.map(b => b.ms[m]), val), pred = divs.length ? val * median(divs.map(b => b.ms['24'] / b.ms[m])) : null;
     return { v, m, val, top: Math.max(1, p), pred: m === '24' ? val : pred };
   }).filter(Boolean).sort((a, b) => a.top - b.top);
 }
@@ -2519,7 +2537,7 @@ function essoufflement(A, C) {
   const tagsC = [...new Set(A.videos.flatMap(v => tags(v.d)).filter(estCamp))];
   for (const t of tagsC) {
     const info = (RAW.campagnes || []).find(c => c.tag === t); if (info && !enCours(t)) continue; // campagne finie : inutile de changer d'angle
-    const vs = A.videos.filter(v => tags(v.d).includes(t) && v.ms?.['24'] > 0);
+    const vs = A.videos.filter(v => tags(v.d).includes(t) && Number.isFinite(v.ms?.['24']) && v.ms['24'] >= 0);
     const s1 = vs.filter(v => now - v.t >= 86400 && now - v.t < 8 * 86400).map(v => v.ms['24']), s2 = vs.filter(v => now - v.t >= 8 * 86400 && now - v.t < 15 * 86400).map(v => v.ms['24']);
     if (s1.length < 6 || s2.length < 6) continue;
     const r = median(s1) / median(s2); out.push({ t, nom: (RAW.campagnes || []).find(c => c.tag === t)?.nom || '#' + t, r, a: median(s1), b: median(s2), n1: s1.length, n2: s2.length });
@@ -2534,7 +2552,7 @@ function lireDiagnostic(A, C, vs, med) {
   if (cacheDiagnostic?.source === RAW && cacheDiagnostic.compte === A.id && cacheDiagnostic.periode === periode) return cacheDiagnostic;
   const S = signalPrecoce(A, C);
     const K = cartons(vs), M = motsQuiMarchent(vs), V = vieVideo(A), E = essoufflement(A, C), D = [];
-    if (S.length && S[0].top <= 15) D.push({ f: 3, c: 'g', t: `Une vidéo récente est dans ton <b>top ${S[0].top} %</b> à ${JAL_L[S[0].m]} : elle peut faire ≈ <b>${k(S[0].pred)}</b> en 24 h.`, a: `data-vid="${S[0].v.id}"`, g: `top ${S[0].top} %`, s: `une vidéo récente, à ${JAL_L[S[0].m]} : ≈ ${k(S[0].pred)} vues en 24 h` });
+    if (S.length && S[0].top <= 15 && S[0].pred != null) D.push({ f: 3, c: 'g', t: `Une vidéo récente est dans ton <b>top ${S[0].top} %</b> à ${JAL_L[S[0].m]} : elle peut faire ≈ <b>${k(S[0].pred)}</b> en 24 h.`, a: `data-vid="${S[0].v.id}"`, g: `top ${S[0].top} %`, s: `une vidéo récente, à ${JAL_L[S[0].m]} : ≈ ${k(S[0].pred)} vues en 24 h` });
     if (K && K.lignes[0]) { const x = K.lignes[0]; D.push({ f: Math.abs(Math.log(x.r)) * 2, c: 'g', t: `Tes cartons ${x.verbe} <b>${x.r >= 1 ? fx(x.r) + ' plus' : fx(1 / x.r) + ' moins'}</b>${x.nom === 'durée' ? ' longtemps' : ''} que tes autres vidéos (${x.fmtx(x.a)} contre ${x.fmtx(x.b)}).`, a: 'data-an="contenu"', g: fx(x.r >= 1 ? x.r : 1 / x.r), s: (x.nom === 'durée' ? `tes cartons sont ${x.r >= 1 ? 'plus longs' : 'plus courts'}` : x.nom === 'titre' ? `tes cartons ont un titre ${x.r >= 1 ? 'plus long' : 'plus court'}` : `${x.r >= 1 ? 'plus' : 'moins'} de ${x.nom} sur tes cartons`) + ` (${x.fmtx(x.a)} contre ${x.fmtx(x.b)})` }); }
     if (M && M.haut[0]) D.push({ f: Math.log(M.haut[0].r), c: 'c', t: `Le mot <b>« ${esc(M.haut[0].w)} »</b> dans le titre : <b>${fx(M.haut[0].r)}</b> ta vidéo normale (${M.haut[0].n} vidéos).`, a: 'data-an="contenu"', g: fx(M.haut[0].r), s: `ta normale avec « ${esc(M.haut[0].w)} » dans le titre (${M.haut[0].n} vidéos)` });
     if (E[0] && E[0].r <= .75) D.push({ f: Math.abs(Math.log(E[0].r)) * 1.5, c: 'b', t: `<b>${esc(E[0].nom)}</b> s’essouffle : <b>${Math.round((1 - E[0].r) * 100)} % de vues en moins</b> à 24 h que la semaine d’avant. Change d’angle ou de format.`, a: 'data-an="vie"', g: `−${Math.round((1 - E[0].r) * 100)} %`, s: `${esc(E[0].nom)} s’essouffle à 24 h : change d’angle` });
@@ -2693,15 +2711,15 @@ function ficheGroupe(id, i) {
 
 function ficheJour(d) {
   const A = compteCourant(), C = calc(A), Q = A.quotidien || {}, q = Q[d] || {}, p = Q[addJour(d, -1)];
-  const vs = A.videos.filter(v => pz(v.t * 1000).day === d).sort((a, b) => b.v - a.v);
+  const tous = A.videos.filter(v => pz(v.t * 1000).day === d), vs = tous.filter(estCyclom).sort((a, b) => b.v - a.v);
   const dv = p ? pct(q.g, p.g) : null, df = q.f != null && p?.f != null ? q.f - p.f : null;
   let h = `<div class="grab"></div><div class="sheet-h"><h2>${dayLabel(d)}${d === C.P.day ? " · aujourd'hui" : ''}</h2><button class="x" type="button" data-close aria-label="Fermer">×</button></div>
     ${navJour(d, A, C, 'fday')}
     ${Q[d] ? '' : '<div class="muted" style="font-size:12.5px">Pas de chiffres du compte pour ce jour (avant le début du relevé). Les vidéos postées restent visibles.</div>'}
     <div class="kv kv-fm"><button type="button" data-fm="g"><span>Vues</span><b class="num">${fmt(q.g)} ${dv != null ? `<small class="${dv >= 0 ? 'up' : 'down'}">${pctTxt(dv)}</small>` : ''}</b></button><button type="button" data-fm="f"><span>Abonnés gagnés</span><b class="num">${df != null ? (df >= 0 ? '+' : '') + fmt(df) : '—'}</b></button>
     <button type="button" data-fm="l"><span>Likes</span><b class="num">${fmt(q.l)}</b></button><button type="button" data-fm="s"><span>Partages</span><b class="num">${fmt(q.s)}</b></button><button type="button" data-fm="c"><span>Commentaires</span><b class="num">${fmt(q.c)}</b></button><button type="button" data-fm="p"><span>Vidéos postées</span><b class="num">${vs.length}</b></button></div>`;
-  h += vs.length ? `<div class="sec-h"><h2>Postées ce jour</h2><small>${k(vs.reduce((s, v) => s + v.v, 0))} vues à ce jour</small></div><div class="grid">${vs.slice(0, 15).map(v => vcard(v, C)).join('')}</div>` : `<div class="muted">Aucune vidéo postée ce jour.</div>`;
-  if (vs.length) h += `<button class="more" type="button" data-go="videos" data-per="d:${d}">${vs.length > 1 ? `Voir les ${vs.length} vidéos` : 'Voir la vidéo'} dans Vidéos</button>`;
+  h += vs.length ? `<div class="sec-h"><h2>Vidéos Cyclom ce jour</h2><small>${k(vs.reduce((s, v) => s + v.v, 0))} vues à ce jour</small></div><div class="grid">${vs.slice(0, 15).map(v => vcard(v, C)).join('')}</div>` : `<div class="muted">Aucune vidéo Cyclom postée ce jour.</div>`;
+  if (tous.length) h += `<button class="more" type="button" data-go="videos" data-per="d:${d}">${tous.length > vs.length ? `Toutes les vidéos du jour (${tous.length}) dans Vidéos` : tous.length > 1 ? `Voir les ${tous.length} vidéos dans Vidéos` : 'Voir la vidéo dans Vidéos'}</button>`;
   ouvrir(h);
 }
 
@@ -2860,7 +2878,7 @@ function resume(A, C) {
   return `Compte(s) : @${A.user}. Abonnés ${A.abonnes}. ${A.nb_videos} vidéos, ${A.vues_total} vues au total.
 Aujourd'hui (${C.P.hour}h) : ${C.today} vues, hier à la même heure ${Math.round(C.ySame ?? 0)}, estimation fin de journée ${Math.round(C.est ?? 0)}, ${C.duJour.length} vidéos postées, abonnés +${A.abonnes_jour ?? '?'}.
 Vidéo normale : ~${Math.round(C.normal ?? 0)} vues.
-Objectif du jour : ${objectif(A, C) ? Math.round(objectif(A, C).v) : '?'} vues. Série : ${serie(A, C)} jours d'affilée avec une vidéo postée.
+Objectif du jour : ${objectif(A, C) ? Math.round(objectif(A, C).v) : '?'} vues. Série : ${serie(A, C)} jours d'affilée avec au moins ${MIN_JOUR} vidéos postées (règle : ${MIN_JOUR} par jour minimum, pousser au volume).
 Gains estimés (tarifs du clippeur) : ${(() => { const G = gains(A); return G ? Math.round(G.auj * 100) / 100 + ' € aujourd\'hui, ' + Math.round(G.tot) + ' € au total' : 'tarifs non renseignés'; })()}.
 Vidéos peut-être bloquées (moins de 15 % des vues habituelles) : ${A.videos.filter(v => C.suspecte(v)).length}.
 Meilleures vidéos du jour :\n${top.join('\n') || 'aucune'}
@@ -2948,7 +2966,7 @@ function render() {
 // Téléphone (Jawed 24/11 : « trop de gros trucs dès qu'on ouvre une page ») : façon Apple / TikTok, chaque section
 // devient une ligne (titre + résumé + ›) qu'on touche pour l'ouvrir. L'essentiel (le gros chiffre) reste ouvert. PC inchangé.
 // Jawed 25/11 « tu en caches un peu trop » : les sections qui servent tous les jours sont OUVERTES d'office (on peut les replier, c'est retenu)
-const IMPORTANTES = new Set(['Pourquoi tes vues', 'Plan du jour', 'Heure par heure', 'Ce qui monte', 'Ce qui rapporte', 'Les clips qui cartonnent', 'Postées ce jour', 'Postées ce jour-là', 'Ce qui a rapporté ce jour-là', 'Ta série']);
+const IMPORTANTES = new Set(['Pourquoi tes vues', 'Plan du jour', 'Heure par heure', 'Ce qui monte', 'Ce qui rapporte', 'Les clips qui cartonnent', 'Postées ce jour', 'Vidéos Cyclom ce jour', 'Vidéos Cyclom ce jour-là', 'Postées ce jour-là', 'Ce qui a rapporté ce jour-là', 'Ta série']);
 const FERMES = new Set((() => { try { return JSON.parse(localStorage.getItem('cs_fermes') || '[]'); } catch (e) { return []; } })());
 const OUVERTS = new Set((() => { try { return JSON.parse(localStorage.getItem('cs_ouverts') || '[]'); } catch (e) { return []; } })());
 function replier(main = $('#main'), VUE = VIEW) {
@@ -3212,6 +3230,31 @@ document.addEventListener('keydown', e => {
   const sv = $('#sheet').dataset.vid; if (!sv || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
   const i = CTX.indexOf(sv) + (e.key === 'ArrowRight' ? 1 : -1); if (CTX[i]) { e.preventDefault(); ficheVideo(CTX[i]); } });
 
+// ---------- TOUT LE DASHBOARD = VIDÉOS #CYCLOM SEULEMENT (Jawed 27/11 : « sinon c'est rejeté ») ----------
+// Les vidéos sans hashtag contenant « cyclom » sont retirées, et leurs vues sont ôtées des totaux du compte
+// (jour par jour avec vd, heure par heure avec vh). Abonnés = chiffre du compte, impossible à séparer.
+function seulCyclom(R) {
+  if (!R || !Array.isArray(R.comptes)) return R;
+  const P = pz(Date.now());
+  for (const a of R.comptes) {
+    const hors = (a.videos || []).filter(v => !estCyclom(v)); if (!hors.length) continue;
+    a.videos = a.videos.filter(estCyclom);
+    const Q = a.quotidien || {}, H = a.horaire || {}; let auj = 0, hre = 0;
+    for (const v of hors) {
+      if (v.vd) { const ks = Object.keys(v.vd).sort(), jp = pz(v.t * 1000).day;
+        ks.forEach((d, i) => { const g = v.vd[d] - (i ? v.vd[ks[i - 1]] : d === jp ? 0 : v.vd[d]); if (!(g > 0)) return;
+          if (Q[d]?.g != null) Q[d].g = Math.max(0, Q[d].g - g); if (d === P.day) auj += g; }); }
+      if (Array.isArray(v.vh)) v.vh.forEach((x, i) => { if (!i) return; const g = x[1] - v.vh[i - 1][1]; if (!(g > 0)) return;
+        const kk = pz(x[0]).key; if (H[kk] != null) H[kk] = Math.max(0, H[kk] - g); if (kk === P.key) hre += g; });
+      if (a.vues_total != null) a.vues_total = Math.max(0, a.vues_total - (v.v || 0));
+    }
+    if (a.nb_videos != null) a.nb_videos = a.videos.length;
+    if (a.jour?.gained != null) a.jour = { ...a.jour, gained: Math.max(0, a.jour.gained - auj) };
+    if (a.heure?.gained != null) a.heure = { ...a.heure, gained: Math.max(0, a.heure.gained - hre) };
+  }
+  return R;
+}
+
 // ---------- Mode Drive (dashboard perso) ----------
 function convertir(d) {
   const gj = Object.fromEntries(d.top_today?.list || []), gh = Object.fromEntries(d.rising?.list || []);
@@ -3226,10 +3269,10 @@ function convertir(d) {
   for (const [kk, x] of Object.entries(d.daily || {})) { if (!x.g && Q[kk]) continue;
     Q[kk] = { g: x.g || 0, f: x.f ?? Q[kk]?.f, l: x.l0 != null ? x.l - x.l0 : Q[kk]?.l, c: x.c0 != null ? x.c - x.c0 : Q[kk]?.c, s: x.s0 != null ? x.s - x.s0 : Q[kk]?.s }; }
   const H = {}; for (const [kk, x] of Object.entries(d.hourly || {})) H[kk] = x.g || 0;
-  return { maj: d.updated, moi: { nom: 'Jawed', admin: true }, assistant: { restant: 30, max: 30 },
+  return seulCyclom({ maj: d.updated, moi: { nom: 'Jawed', admin: true }, assistant: { restant: 30, max: 30 },
     campagnes: [{ tag: 'cyclomxdjadelshow', nom: 'Djadel Show' }, { tag: 'cyclomxdeja', nom: 'Ilyes Djadel — Déjà' }, { tag: 'cyclomxmdr', nom: 'MDR' }, { tag: 'cyclomxredouane', nom: 'Redouane Bougheraba' }, { tag: 'cyclomxkraken', nom: 'Kraken' }],
     comptes: [{ id: 'clipfrfilm', user: 'clipfrfilm', abonnes: d.followers, likes: d.hearts, nb_videos: d.tracked, vues_total: d.total,
-      jour: d.today, heure: d.hour, abonnes_jour: d.followers_day, horaire: H, quotidien: Q, videos }] };
+      jour: d.today, heure: d.hour, abonnes_jour: d.followers_day, horaire: H, quotidien: Q, videos }] });
 }
 const DRIVE_ERR = { server_not_connected: 'Google Drive n’est pas connecté : ajoute-le dans claude.ai, Paramètres, Connecteurs.', needs_reauth: 'La connexion Google Drive a expiré : reconnecte-la dans claude.ai, Paramètres, Connecteurs.',
   not_granted: 'Autorise la page à lire Google Drive pour voir tes stats.', approval_required: 'Autorise la page à lire Google Drive pour voir tes stats.', no_file: 'Fichier de stats introuvable sur Google Drive.' };
@@ -3335,7 +3378,7 @@ async function charger() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const nv = await r.json(); if (!nv || !Array.isArray(nv.comptes) || !nv.comptes.every(a => a && a.id != null && Array.isArray(a.videos))) throw new Error('données invalides');
     if (n !== charger.n) return; // réponse dépassée par une plus récente
-    const avant = RAW; RAW = nv;
+    const avant = RAW; RAW = seulCyclom(nv);
     clearTimeout(charger.t); if ((RAW.en_attente || []).length || !RAW.comptes.length) charger.t = setTimeout(charger, 15000);
     if (avant && (!$('#sheet').hidden || document.activeElement?.id === 'q')) { A_RENDRE = true; fraicheur(); return; } // ne jamais casser ce que la personne fait
     rendreDoux(avant);
@@ -3598,31 +3641,31 @@ const NV = (() => {
 
   // ---------- SÉRIE ----------
   function infosSerie(A, C) {
-    const J0 = jourSerie(C), jours = new Set(A.videos.map(v => pz(v.t * 1000).day)), n = serie(A, C), auj = jours.has(J0);
+    const J0 = jourSerie(C), PJ = parJour(A), jours = joursPleins(A), n = serie(A, C), auj = jours.has(J0), postAuj = PJ.get(J0) || 0, reste = Math.max(0, MIN_JOUR - postAuj);
     let rec = 0, cur = 0; for (const d of [...jours].sort()) { cur = jours.has(addJour(d, -1)) ? cur + 1 : 1; if (cur > rec) rec = cur; }
     const wd = (new Date(+J0.slice(0, 4), +J0.slice(4, 6) - 1, +J0.slice(6, 8)).getDay() + 6) % 7, lundi = addJour(J0, -wd);
-    const sem = Array.from({ length: 7 }, (_, i) => { const d = addJour(lundi, i); return { d, l: 'LMMJVSD'[i], ok: jours.has(d), auj: d === J0, futur: d > J0 }; });
+    const sem = Array.from({ length: 7 }, (_, i) => { const d = addJour(lundi, i); return { d, l: 'LMMJVSD'[i], ok: jours.has(d), mi: !jours.has(d) && PJ.has(d), auj: d === J0, futur: d > J0 }; });
     const nbSem = d0 => A.videos.filter(v => { const d = pz(v.t * 1000).day; return d >= d0 && d <= addJour(d0, 6); }).length;
     const passees = [1, 2, 3].map(w => nbSem(addJour(lundi, -7 * w))).filter(x => x > 0), base = passees.length ? Math.ceil(median(passees) * 1.05) : null;
-    const obj = base ? Math.max(7, base) : 14, fait = nbSem(lundi);
-    const pourquoi = !base ? '2 par jour pour démarrer' : base >= 7 ? 'ton rythme habituel + 5 %' : '1 par jour minimum';
-    return { n, auj, rec, sem, obj, fait, pourquoi, jour: J0, lundi };
+    const obj = Math.max(MIN_JOUR * 7, base || 0), fait = nbSem(lundi);
+    const pourquoi = base && base > MIN_JOUR * 7 ? 'ton rythme habituel + 5 %' : MIN_JOUR + ' par jour minimum';
+    return { n, auj, rec, sem, obj, fait, pourquoi, jour: J0, lundi, postAuj, reste };
   }
   function widgetSerie(A, C) {
     const S = infosSerie(A, C);
     return `<button class="nv-w nv-serie ${S.auj ? 'ok' : S.n ? 'danger' : ''}" type="button" data-serie>
       <span class="nv-lbl">Ta série</span>
       <span class="nv-big">${FLAMME}<b class="num">${S.n}</b><small>${S.n > 1 ? 'jours' : 'jour'}</small></span>
-      <span class="nv-sem">${S.sem.map(x => `<i class="${x.ok ? 'on' : ''} ${x.auj ? 'auj' : ''} ${x.futur ? 'fut' : ''}">${x.l}</i>`).join('')}</span>
-      <span class="nv-sub">${S.auj ? 'Gardée aujourd’hui' : S.n ? 'Poste aujourd’hui pour la garder' : 'Poste une vidéo pour la lancer'}</span></button>`;
+      <span class="nv-sem">${S.sem.map(x => `<i class="${x.ok ? 'on' : x.mi ? 'mi' : ''} ${x.auj ? 'auj' : ''} ${x.futur ? 'fut' : ''}">${x.l}</i>`).join('')}</span>
+      <span class="nv-sub">${S.auj ? `Gardée · ${S.postAuj} vidéos aujourd’hui` : `<b>${S.postAuj}/${MIN_JOUR}</b> · encore ${pluriel(S.reste, 'vidéo')} pour la ${S.n ? 'garder' : 'lancer'}`}</span></button>`;
   }
   function ficheSerie() {
     const A = compteCourant(), C = calc(A), S = infosSerie(A, C), p = Math.min(100, S.fait / S.obj * 100);
-    const jours = new Set(A.videos.map(v => pz(v.t * 1000).day)), debut = addJour(S.lundi, -21);
-    const cal = Array.from({ length: 28 }, (_, i) => { const d = addJour(debut, i); return `<i class="${jours.has(d) ? 'on' : ''} ${d === S.jour ? 'auj' : ''} ${d > S.jour ? 'fut' : ''}" title="${dayLabel(d)}"></i>`; }).join('');
+    const jours = joursPleins(A), PJ = parJour(A), debut = addJour(S.lundi, -21);
+    const cal = Array.from({ length: 28 }, (_, i) => { const d = addJour(debut, i); return `<i class="${jours.has(d) ? 'on' : PJ.has(d) ? 'mi' : ''} ${d === S.jour ? 'auj' : ''} ${d > S.jour ? 'fut' : ''}" title="${dayLabel(d)}"></i>`; }).join('');
     ouvrir(`<div class="grab"></div><div class="sheet-h"><h2>Ta série</h2><button class="x" type="button" data-close aria-label="Fermer">×</button></div>
       <div class="nv-fs ${S.auj ? 'ok' : S.n ? 'danger' : ''}">${FLAMME}<b class="num">${S.n}</b><span>${S.n > 1 ? 'jours d’affilée' : S.n ? 'jour' : 'pas de série en cours'}</span></div>
-      <p class="say" style="max-width:none">${S.auj ? 'Tu as posté aujourd’hui : ta série continue demain.' : S.n ? `<b>Poste avant minuit</b> pour passer à ${S.n + 1} jours. Sinon la série repart de zéro.` : 'Poste aujourd’hui pour démarrer une série.'}${S.rec ? ` Ton record : <b>${S.rec} jour${S.rec > 1 ? 's' : ''}</b>.` : ''}</p>
+      <p class="say" style="max-width:none">${S.auj ? `${S.postAuj} vidéos aujourd’hui : ta série continue demain. Chaque vidéo en plus, c’est un ticket de plus.` : S.n ? `<b>Encore ${pluriel(S.reste, 'vidéo')} avant minuit</b> pour passer à ${S.n + 1} jours. Sinon la série repart de zéro.` : `Poste <b>${pluriel(S.reste, 'vidéo')}</b> aujourd’hui pour lancer ta série.`} Un jour compte à partir de <b>${MIN_JOUR} vidéos</b>.${S.rec ? ` Ton record : <b>${S.rec} jour${S.rec > 1 ? 's' : ''}</b>.` : ''}</p>
       <div class="nv-obj"><div class="nv-obj-h"><span>Objectif de la semaine</span><b class="num">${S.fait} / ${S.obj} vidéos</b></div><span class="tr"><i style="width:${p.toFixed(1)}%"></i></span>
         <small class="muted">${S.fait >= S.obj ? 'Objectif atteint, bien joué.' : `Encore ${S.obj - S.fait} cette semaine (${S.pourquoi}).`}</small></div>
       <div class="nv-cal-h"><span>4 dernières semaines</span><span class="muted">L M M J V S D</span></div><div class="nv-cal">${cal}</div>`);
@@ -3879,7 +3922,7 @@ if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') wind
 // ===== STUDIO+ (Jawed 25/11) : « je peux pas appuyer sur abonnés, voir mes abonnés du jour, d'hier… », « rends maniables les courbes »,
 // « plein de trucs stylés et utiles ». Chaque chiffre ouvre sa FICHE (aujourd'hui, hier, 7 j, 28 j, record, jours de la semaine, rang du jour,
 // projection) et TOUTES les courbes se manipulent : 1 doigt = la valeur du jour touché, 2 doigts (ou clic glissé) = le total entre deux jours.
-function gxAttr(o) { return ` data-gx="${esc(JSON.stringify(o))}"`; }
+function gxAttr(o) { return ` data-gx="${esc(JSON.stringify(o))}" tabindex="0" aria-keyshortcuts="ArrowLeft ArrowRight Home End Escape"`; }
 const SP = (() => {
   const MET = { g: ['Vues', 'vues'], f: ['Abonnés', 'abonnés'], l: ['Likes', 'likes'], s: ['Partages', 'partages'], c: ['Commentaires', 'comms'], p: ['Clips postés', 'clips'] };
   const PERS = [[7, '7 j'], [28, '28 j'], [90, '90 j'], [0, 'Tout']];
@@ -3914,8 +3957,8 @@ const SP = (() => {
     let s = `<svg class="sp-svg" viewBox="0 0 ${W} ${Ht}" role="img" aria-label="${esc(o.titre || 'Courbe')}"${gxAttr({ W, px: L.map((x, i) => +X(i).toFixed(1)), py: L.map(x => x[1] == null ? null : +Y(Math.max(0, x[1])).toFixed(1)), bw: +bw.toFixed(1), lab: L.map(x => o.lab ? o.lab(x[0]) : dayLabel(x[0])), val: vals, v2: L2 ? L2.map(x => x?.[1] ?? null) : null, mode: o.mode || 'somme', u: o.u || '' })}>
       <defs><linearGradient id="spg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#52f0de" stop-opacity=".32"/><stop offset="1" stop-color="#52f0de" stop-opacity="0"/></linearGradient></defs>`;
     for (const g of [bas, (top + bas) / 2, top].filter((x, i, a) => a.indexOf(x) === i)) s += `<line x1="${pl}" x2="${W - pr + 6}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}" stroke="rgba(255,255,255,${g === 0 ? .14 : .06})"/><text x="${W - 2}" y="${(Y(g) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#8a9aae">${k(g)}</text>`;
-    if (L2) { const pts = L2.map((x, i) => x?.[1] != null ? [X(i), Y(x[1])] : null).filter(Boolean);
-      if (pts.length > 1) s += `<path d="${pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ')}" fill="none" stroke="rgba(255,255,255,.38)" stroke-width="1.5" stroke-dasharray="3 4"/>`; }
+    if (L2) { const pts = L2.map((x, i) => x?.[1] != null ? [X(i), Y(x[1])] : null), dd = pts.map((p, i) => p ? (pts[i - 1] ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1) : '').join(' ');
+      if (pts.filter(Boolean).length > 1) s += `<path d="${dd}" fill="none" stroke="rgba(255,255,255,.38)" stroke-width="1.5" stroke-dasharray="3 4"/>`; }
     if (barres) L.forEach((x, i) => { const v = x[1]; if (v == null || v === 0) return; const y0 = Y(0), y1 = Y(v);
       s += `<rect x="${(X(i) - bw * .34).toFixed(1)}" y="${Math.min(y0, y1).toFixed(1)}" width="${(bw * .68).toFixed(1)}" height="${Math.max(1, Math.abs(y0 - y1)).toFixed(1)}" rx="${Math.min(4, bw * .2).toFixed(1)}" fill="${v < 0 ? '#ff5c7c' : i === n - 1 ? '#8af7ea' : '#52f0de'}" opacity="${i === n - 1 ? 1 : .82}"/>`; });
     else { const pts = L.map((x, i) => x[1] != null ? [X(i), Y(x[1])] : null).filter(Boolean);
@@ -4026,7 +4069,7 @@ const SP = (() => {
   }
 
   // ---- le doigt sur la courbe ----
-  let tip = null; const P = new Map(); let cible = null, sourisBas = null, cache = null;
+  let tip = null; const P = new Map(); let cible = null, sourisBas = null, cache = null, epingle = null, kbI = null;
   const lire = svg => { if (cache?.el === svg) return cache.o; try { const o = JSON.parse(svg.dataset.gx); cache = { el: svg, o }; return o; } catch (e) { return null; } };
   const indice = (svg, o, x) => { const r = svg.getBoundingClientRect(), sx = (x - r.left) * o.W / r.width; let b = 0, bd = 1e9; o.px.forEach((p, i) => { const d = Math.abs(p - sx); if (d < bd) { bd = d; b = i; } }); return b; };
   const NS = 'http://www.w3.org/2000/svg';
@@ -4059,21 +4102,31 @@ const SP = (() => {
     if (neuf) requestAnimationFrame(() => tip.classList.add('on'));
     if (navigator.vibrate && montrer.der !== a) { try { navigator.vibrate(3); } catch (e) {} } montrer.der = a;
   }
-  function cacher() { montrer.cle = null; if (tip) { tip.classList.remove('on'); tip.hidden = true; } cible?.querySelector('.gx-o')?.remove(); cible?.classList.remove('gx-on'); cible = null; }
+  function cacher() { epingle = null; kbI = null; montrer.cle = null; if (tip) { tip.classList.remove('on'); tip.hidden = true; } cible?.querySelector('.gx-o')?.remove(); cible?.classList.remove('gx-on'); cible = null; }
   let majR = 0; function maj() { if (majR) return; majR = requestAnimationFrame(() => { majR = 0; maj_(); }); }
   function maj_() { if (!cible) return; const o = lire(cible); if (!o) return; const xs = [...P.values()];
     if (xs.length >= 2) montrer(cible, indice(cible, o, xs[0]), indice(cible, o, xs[1])); else if (xs.length === 1) montrer(cible, sourisBas != null ? sourisBas : indice(cible, o, xs[0]), sourisBas != null ? indice(cible, o, xs[0]) : null); }
-  document.addEventListener('pointerdown', e => { const svg = e.target.closest?.('svg[data-gx]'); if (!svg) return;
+  document.addEventListener('pointerdown', e => { const svg = e.target.closest?.('svg[data-gx]'); if (!svg) { if (epingle) cacher(); return; } epingle = null;
     if (cible && cible !== svg) cacher(); cible = svg; P.set(e.pointerId, e.clientX);
     if (e.pointerType === 'mouse') { const o = lire(svg); sourisBas = o ? indice(svg, o, e.clientX) : null; }
     maj(); }, true);
   document.addEventListener('pointermove', e => { if (cible && P.has(e.pointerId)) { P.set(e.pointerId, e.clientX); return maj(); }
-    if (e.pointerType === 'mouse') { const svg = e.target.closest?.('svg[data-gx]'); if (svg) { cible = svg; const o = lire(svg), x = e.clientX; if (o && !majR) majR = requestAnimationFrame(() => { majR = 0; if (cible === svg) montrer(svg, indice(svg, o, x)); }); } else if (cible && !P.size) cacher(); } }, true);
-  const fin = e => { if (!P.has(e.pointerId)) return; P.delete(e.pointerId); sourisBas = null; if (!P.size) { const c = cible; setTimeout(() => { if (cible === c && !P.size) cacher(); }, e.pointerType === 'mouse' ? 0 : 1600); } else maj(); };
+    if (e.pointerType === 'mouse' && !epingle) { const svg = e.target.closest?.('svg[data-gx]'); if (svg) { cible = svg; const o = lire(svg), x = e.clientX; if (o && !majR) majR = requestAnimationFrame(() => { majR = 0; if (cible === svg) montrer(svg, indice(svg, o, x)); }); } else if (cible && !P.size) cacher(); } }, true);
+  const fin = e => { if (!P.has(e.pointerId)) return; P.delete(e.pointerId); sourisBas = null; if (!P.size && e.pointerType === 'mouse' && cible) { epingle = cible; return; } if (!P.size) { const c = cible; setTimeout(() => { if (cible === c && !P.size) cacher(); }, e.pointerType === 'mouse' ? 0 : 1600); } else maj(); };
   document.addEventListener('pointerup', fin, true); document.addEventListener('pointercancel', fin, true);
   // la courbe garde le doigt : ni glisser pour fermer la feuille, ni vidéo suivante, ni tirer pour actualiser
   for (const t of ['touchstart', 'touchmove']) document.addEventListener(t, e => { if (e.target.closest?.('svg[data-gx]')) e.stopPropagation(); }, { capture: true, passive: true });
-  document.addEventListener('scroll', () => { if (!P.size) cacher(); }, true);
+  document.addEventListener('scroll', () => { if (!P.size && !(kbI != null && cible === document.activeElement)) cacher(); }, true);
+  // F08 clavier : la courbe se lit point par point (← → Début Fin), Échap libère
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && (epingle || kbI != null)) { e.stopPropagation(); e.preventDefault(); const f = cible; cacher(); f?.focus?.(); return; }
+    const svg = document.activeElement; if (!svg?.matches?.('svg[data-gx]')) return; const o = lire(svg); if (!o) return; const n = o.px.length;
+    const pas = { ArrowLeft: -1, ArrowRight: 1, ArrowDown: -1, ArrowUp: 1 }[e.key];
+    if (pas == null && e.key !== 'Home' && e.key !== 'End' && e.key !== 'Enter' && e.key !== ' ') return;
+    e.stopPropagation(); e.preventDefault(); if (cible && cible !== svg) cacher(); cible = svg;
+    const i0 = kbI != null ? kbI : n - 1; kbI = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : pas != null ? Math.max(0, Math.min(n - 1, i0 + pas)) : i0;
+    montrer(svg, kbI); if (tip) { tip.setAttribute('role', 'status'); tip.setAttribute('aria-live', 'polite'); } }, true);
+  document.addEventListener('focusout', e => { if (e.target.matches?.('svg[data-gx]') && kbI != null && cible === e.target) cacher(); }, true);
 
   // ---- ouvrir une fiche ----
   document.addEventListener('click', e => {
